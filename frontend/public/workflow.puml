@@ -1,0 +1,34 @@
+@startuml
+title The Smallest Agent - streaming workflow
+autonumber
+actor "Student / Browser" as Browser
+participant "Angular AgentService" as Angular
+participant "FastAPI / agent_service.py" as API
+participant "Python Agent SDK / CLI" as SDK
+participant "Claude API" as Claude
+Browser -> Angular: Run agent(prompt)
+Angular -> API: POST /api/agent/stream
+alt Valid prompt and configured key
+  API -> API: Validate; apply tools=[] options
+  API -> SDK: stream_agent() / query()
+  SDK -> Claude: Prompt; no built-in tools
+  Claude --> SDK: Model response
+  note over API, SDK: Lifecycle messages may arrive while inference runs.
+  loop Each intermediate SDK message
+    SDK --> API: Safe SDK message
+    API --> Angular: SSE message event
+    Angular --> Browser: Update timeline signal
+  end
+  alt Final result received
+    SDK --> API: ResultMessage fields
+    API --> Angular: SSE message: ResultMessage
+    Angular --> Browser: Render answer and metrics (respect is_error)
+    API --> Angular: SSE done
+  else SDK failure or missing final result
+    API --> Angular: SSE error (no done)
+    Angular --> Browser: Friendly error and snackbar
+  end
+else Missing key or invalid prompt
+  API --> Angular: Missing key: SSE error; invalid input: HTTP 422
+end
+@enduml

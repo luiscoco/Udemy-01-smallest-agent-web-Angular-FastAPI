@@ -1,0 +1,219 @@
+You are working in an EMPTY folder. Create from scratch a complete, enterprise-style web application called "The Smallest Agent · Web Edition", with an Angular front-end, a FastAPI back-end and the Claude Agent SDK for Python.
+
+The audience is Udemy students building their first AI agent. The goal is to show them how a minimal agent is integrated into a real enterprise application. Keep the code small, readable and well commented. Do not add features beyond what is listed here. The application includes a working lab and four supporting lesson sections, as specified in section 4.
+
+== REQUIRED OUTCOME (all requested refinements are mandatory) ==
+This is the consolidated specification. Deliver all of the following together:
+1. Create the app in its own new project folder when starting from a populated workspace. Keep unrelated lesson files intact. When explicitly updating an existing app, preserve its .env and existing student configuration.
+2. Keep the recognizable Lesson 0 Python agent inside a real Angular + FastAPI application, with server-side credentials and built-in agent tools disabled.
+3. Use the supplied GitHub application as the visual and educational reference: blue/orange course styling, a local astronaut illustration, numbered teaching content and five functional lesson sections. Adapt the content to THIS Python application rather than copying the reference's TypeScript/file-discovery behavior.
+4. Make the application comfortably readable: approximately 21px body text on desktop, 19px on mobile, at least 16px helper text, and large headings, controls and code. Preserve this readability in dark mode, at narrow widths and at 200% browser zoom.
+5. Give cards visibly light pastel backgrounds: pale blue, lilac, mint and peach, with accessible dark-theme variants. Do not substitute plain white cards or barely visible gradients for this requirement.
+6. Format and syntax-color every block code example: Python, TypeScript, PowerShell, Bash, .env/INI, inspector JSON and supported fenced code in the agent's Markdown answers. Preserve indentation and text, use local grammars, and keep Angular sanitization enabled.
+7. Include a proper UML sequence/workflow diagram that explains the real application steps, with participant lifelines, numbered calls/returns, streaming loops and success/error alternatives. Include readable labels, an accessible scrollable view, an SVG download and editable PlantUML source. Directly below the diagram, explain EVERY numbered UML step with its own matching card, actual syntax-colored and formatted source excerpt, source filename and a plain-language explanation of how that code implements or observes the step.
+8. Provide complete, beginner-friendly .env configuration and exact startup commands for two terminals, including safe first-time file creation, backend restart instructions and missing-key troubleshooting.
+9. Update the README and verification record, run appropriate checks, and keep this prompt and the project's BUILD-PROMPT.txt identical. Do not report a visual requirement as completed merely because it appears in the README: implement it in the application.
+
+== 0. THE STARTING POINT (the agent students already know) ==
+In the previous lesson, students built this 7-line terminal agent (agent.py):
+
+    import asyncio
+    import os
+    from claude_agent_sdk import query, ResultMessage
+
+    os.environ["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false"   # optional: hides the claude.ai connectors warning
+
+    async def main():
+        async for message in query(prompt="Hello world!"):
+            if isinstance(message, ResultMessage):
+                print(message.result)
+
+    asyncio.run(main())
+
+A prompt goes in, query() streams messages back, the loop ignores the intermediate messages, and the final ResultMessage.result is printed. The web app must keep this exact pattern recognizable inside ONE back-end file, and wrap it with an API and a modern GUI.
+
+== 1. TECHNOLOGY VERSIONS (reproducible November 2026 pins; retain exactly) ==
+Pin these exact versions (no ^ or ~ ranges in package.json, and == in requirements.txt), so every student gets the same build.
+
+Runtimes
+- Python 3.10+ (3.14 recommended)
+- Node.js 24 LTS (>= 24.15) or Node.js 26. These are the Node versions Angular 22 supports.
+
+Back-end (requirements.txt)
+- claude-agent-sdk==0.2.179
+- fastapi==0.162.2
+- uvicorn[standard]==0.54.0
+- pydantic==2.14.3
+- pydantic-settings==2.16.2
+- pytest==9.2.0
+- httpx==0.28.1        (used by FastAPI's TestClient)
+
+Front-end (package.json)
+- @angular/core, common, compiler, compiler-cli, forms, router, platform-browser, animations: 22.2.5
+- @angular/cli, @angular/build, @angular/cdk, @angular/material: 22.2.6
+- typescript: 6.0.3
+  IMPORTANT: do NOT use TypeScript 7.x even though it is the npm "latest" tag. Angular 22's compiler only supports TypeScript ">=6.0 <6.1".
+- rxjs: 7.8.2
+- marked: 18.1.3        (renders the answer as Markdown)
+- highlight.js: 11.12.0 (local syntax highlighting; import core and only the required grammars)
+- vitest: 5.0.0
+- jsdom: 30.0.0
+- tslib: 2.9.1
+- prettier: 3.8.1 (if retained from the Angular scaffold)
+- Use Angular 22 defaults: zoneless change detection (no zone.js), standalone components, signals, @if/@for control flow, and Vitest as the test runner.
+
+Before writing code, run the version checks below and report the results. If a pinned version cannot be installed, use the closest compatible version, explain why, and update the README:
+  python --version ; node --version ; npm --version
+
+== 2. FOLDER STRUCTURE ==
+(the current empty folder)/
+  README.md
+  BUILD-PROMPT.txt        (exact copy of this consolidated prompt)
+  ASSETS.md              (external illustration source URL and commit)
+  VERIFICATION.md        (actual checks, results and limitations)
+  .gitignore              (.venv, __pycache__, .pytest_cache, .env, node_modules, dist, .angular)
+  backend/
+    app/
+      __init__.py
+      main.py             (FastAPI app, CORS, routes)
+      agent_service.py    (the ONLY file that imports claude_agent_sdk; contains the 7-line core)
+      schemas.py          (Pydantic request/response models)
+      config.py           (pydantic-settings, reads environment variables and .env)
+    tests/
+      test_api.py         (pytest; the SDK is mocked, so no API key or cost is needed)
+    run.py                (cross-platform start script, see the Windows note)
+    requirements.txt
+    .env.example          (ANTHROPIC_API_KEY=sk-ant-...  plus the optional settings, no real values)
+  frontend/               (created with: npx @angular/cli@22.2.6 new frontend --style=scss --ssr=false --skip-git)
+    proxy.conf.json       (forwards /api to http://localhost:8000 during development)
+    src/app/...
+      lesson-content.ts   (learning goals, setup, architecture, source walkthrough)
+      code-block.ts       (reusable, sanitized syntax-highlighted code component)
+      workflow-steps.ts   (numbered UML steps, source excerpts and explanations)
+    scripts/generate-workflow.py (regenerates the local UML assets)
+    public/workflow.svg   (readable UML sequence diagram)
+    public/workflow.puml  (editable PlantUML source)
+    public/astronaut.png  (course mascot from the reference; document its source)
+
+== 3. BACK-END (FastAPI) ==
+agent_service.py
+- Set os.environ["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false" before any query() call.
+- run_agent(prompt) -> dict: the Lesson 0 loop, almost unchanged. It returns result, num_turns, duration_ms, total_cost_usd and is_error from the ResultMessage.
+- stream_agent(prompt) -> async generator: the same loop, but it yields every message as a JSON-serializable dict {type: <class name>, summary: <short human-readable text>, data: <safe subset of fields>}.
+- Web security: unlike the terminal app, web users must NOT get the agent's built-in tools (Bash, file read/write/edit, web fetch, etc.). Configure ClaudeAgentOptions so that no built-in tools are available and max_turns is small (default 1, configurable). Inspect the installed claude-agent-sdk 0.2.179 package for the exact option names. Do not guess them. Explain this in a code comment.
+- Optional settings in config.py: CLAUDE_MODEL (empty = SDK default model), AGENT_SYSTEM_PROMPT (empty = none), AGENT_MAX_TURNS (default 1), CORS_ORIGINS (default http://localhost:4200).
+
+Endpoints (all under /api, OpenAPI docs at /docs, with tags and descriptions)
+- GET  /api/health -> {status: "ok", api_key_configured: true/false}. Never return the key itself.
+- POST /api/agent/query   body {prompt} -> {result, num_turns, duration_ms, total_cost_usd, is_error}
+- POST /api/agent/stream  body {prompt} -> Server-Sent Events. Send one "message" event per SDK message, then a final "done" event. Send failures as an "error" event instead of dropping the connection. Use FastAPI's native SSE support if fastapi 0.162.2 provides it (check the installed package). Otherwise use StreamingResponse with media type "text/event-stream". Do not add extra SSE libraries.
+- Validation: prompt is required, trimmed, 1 to 4000 characters. Return clean JSON errors. Never leak stack traces or the API key.
+
+Windows note (must be handled): the SDK starts the Claude Code CLI as a subprocess, which needs the Proactor event loop on Windows. Running uvicorn with --reload on Windows can raise NotImplementedError. Create backend/run.py that starts uvicorn in a way that works on Windows, macOS and Linux, test it on this machine, and explain the issue in the README.
+
+== 4. FRONT-END (Angular 22 + Angular Material 22, Material 3) ==
+
+REFERENCE AND VISUAL DIRECTION
+- Before implementing the UI, inspect this reference repository, including public/index.html, public/style.css, public/learn.html, public/run.html, public/architecture.html and public/walkthrough.html:
+  https://github.com/luiscoco/Udemy-Claude-Agent-SDK-lesson01-app
+- Adapt its course-oriented presentation: pale blue page background, softly colored rounded cards, navy text, vivid blue primary actions, warm orange headline emphasis, generous spacing, numbered learning steps, prominent navigation and a course astronaut illustration. Support a complete dark theme and remember the choice in localStorage.
+- The reference is a visual and instructional example. This application remains Angular + FastAPI + the PYTHON Claude Agent SDK. Keep Hello world! as the initial prompt and keep ALL built-in tools disabled. Do not copy the reference's TypeScript server, Glob/file-discovery exercise, working-directory demo, session-ID display, credentials flow or runtime versions.
+- Give the lab panels, learning cards, setup steps and walkthrough cards distinct light background colors (pale blue, lilac, mint and peach). Use shared theme variables rather than nearly invisible gradients on white. Provide darker tinted counterparts in dark mode and keep text contrast accessible.
+- Use the reference's public/astronaut.png as a local asset if accessible, record its source repository URL and commit in ASSETS.md, and give it descriptive alt text. If unavailable, use a restrained code-native visual and explain the limitation; never claim to have copied an asset you could not retrieve. Do not hotlink runtime assets or add an image-generation dependency.
+- Add Material with: ng add @angular/material@22.2.6. Use a custom M3 theme and Roboto or Inter. Remove any duplicate starter theme inserted by the schematic.
+- Typography is a requirement: use approximately 21px desktop body text, 19px mobile body text, 18-22px controls, code at least 18px desktop / 17px mobile, and at least 16px metadata/hints/badges, 28-34px section titles, and a responsive 40-64px hero heading. Use rem units, comfortable line height (1.6-1.8), accessible contrast, visible focus states, descriptive labels and 44px minimum interactive targets. Never shrink helper text to 9-12px. Allow wrapping at narrow widths and 200% browser zoom; code may scroll horizontally inside its own container.
+
+APPLICATION SHELL AND NAVIGATION
+- Header: app identity, backend health dot (green/red from /api/health), a warning when the API key is not configured, and a light/dark toggle. A green dot means API connectivity only, not verified Claude authentication.
+- Hero: a large two-line headline such as "Your first agent. A real web application.", a clear explanation of the terminal-to-browser lesson, Python/FastAPI and Angular/Material tags, and the astronaut illustration. Hide the illustration on small screens so the content remains readable.
+- Provide five genuine navigable sections, inspired by the reference: Application lab, What you will learn, How to run, Architecture & workflow, and Code walkthrough.
+- Use routes or hash-based navigation with deep links, browser back/forward support and a visible active state (aria-current). Keep the lab mounted and preserve its prompt, results and active request when browsing the lesson sections. Navigation must not trigger an API/model request. Include a keyboard skip link.
+- All content must describe THIS application's actual files, settings and behavior. No fake outputs, invented metrics, unused controls, or placeholder navigation. Keep credentials out of the UI.
+
+AGENT SERVICE
+- AgentService (a typed injectable):
+  - query(prompt): HttpClient POST /api/agent/query
+  - stream(prompt): fetch() + ReadableStream that parses SSE frames, because EventSource cannot send a POST. Preserve split UTF-8 characters, split frames and CRLF; handle message/error/done, and reject incomplete streams.
+  - health(): GET /api/health
+
+APPLICATION LAB
+- Add a compact numbered learning strip: 01 Ask a question, 02 Watch the stream, 03 Read the result.
+- Three areas:
+  1. Prompt panel: textarea pre-filled with "Hello world!", a "Run agent" button, a "Stream / Simple" mode toggle, Ctrl+Enter to send, a 4000-character counter, and example prompt chips ("Hello world!", "Explain what an AI agent is in one sentence.", "What is Python?"). Use dynamic hint sizing so larger helper text does not overlap controls.
+  2. Answer card: the final ResultMessage.result rendered as Markdown with marked (bound through [innerHTML] so Angular sanitizes it), a copy button, and prominent stat tiles for turns, duration (ms) and cost (USD). No preloaded answer; show honest idle, running, success and error states.
+  3. Message stream inspector: a live vertical timeline with one row per SDK message, readable colored badges (SystemMessage, AssistantMessage, UserMessage, ResultMessage, other), relative timestamps, short summaries and expandable safe JSON. Explain why these messages matter. In Simple mode, explain that only the final answer is returned and that Stream mode is needed to inspect individual messages.
+- Running state: spinner, live elapsed time, disabled submission, no duplicate requests. Errors: friendly inline message and snackbar. A stream ending without a final result is a failure.
+- Under the lab, explain the request path and tool restrictions. State that actual prompt submission may consume API credits.
+
+WHAT YOU WILL LEARN
+- Six numbered cards: recognize the original agent loop; add a typed API; keep credentials server-side; observe SSE messages; restrict available tools; connect signals and safely render Markdown.
+- Include a short reflection prompt about browser/API boundaries, intermediate messages versus final results, and Simple versus Stream mode.
+
+HOW TO RUN
+- Show beginner-friendly numbered setup steps and separate Windows PowerShell and macOS/Linux command blocks.
+- Start all commands from a clearly identified application folder. Include Python venv creation, pinned requirements installation, a non-overwriting .env copy, and editing backend/.env.
+- Show all .env settings with a CLEAR placeholder, explain that a real sk-ant- key must replace it, and link to https://platform.claude.com. State that existing environment variables override the file and that backend restart is required after edits.
+- Show two terminal cards: backend/run.py in terminal 1 and npm install / npm start in terminal 2. Include links to localhost:8000/docs and localhost:4200, and Ctrl+C stop instructions.
+- Explain that a 503 means a missing/template key, and that health reports configuration presence rather than authenticating with Claude. Do not expose, log or request a real key in the frontend.
+
+ARCHITECTURE & WORKFLOW
+- Present an accessible, responsive flow: Browser -> Angular AgentService -> FastAPI -> Python Agent SDK -> Claude. Keep diagram text readable; do not use an image of tiny text.
+- In addition to the overview, include a proper UML sequence diagram in Architecture & workflow. Use participant headers, vertical dashed lifelines, solid call arrows, dashed return/event arrows, numbered messages, a loop frame for intermediate SDK messages, and alt frames for final result versus SDK failure and for invalid input/missing credentials. This must be a real diagram, not a row of cards labeled UML.
+- Participants: Student/Browser, Angular AgentService/signals, FastAPI with agent_service.py, Python Agent SDK/CLI runtime, and Claude API. Show Run agent -> POST /api/agent/stream -> validation/options -> stream_agent()/query() -> Claude inference -> safe message projection -> SSE -> timeline -> ResultMessage -> answer/metrics -> done. Show SSE error with no done for runtime failure/missing final result, missing-key SSE errors, and HTTP 422 for invalid prompts. A ResultMessage with is_error=true remains a UI failure even if done closes the stream.
+- Distinguish SDK-message streaming from token streaming; do not imply that each SDK message triggers a new model request. Explain that lifecycle messages may arrive while inference is running. Never draw browser-to-Claude credential transmission or enabled file tools.
+- Keep the UML labels large (at least about 18px in the source SVG), provide descriptive alt text plus a nearby text explanation, and place the diagram in a keyboard-focusable horizontal-scroll region on smaller screens. Retain its natural readable width instead of scaling the entire SVG down until the labels become tiny. Offer both a downloadable self-contained SVG and editable PlantUML source. Generate assets locally from a small checked-in script; do not use a hosted rendering service or add a heavy client-side diagram runtime.
+- Directly below the UML diagram, include one numbered explanation card for EVERY numbered interaction (all 16 steps in the current diagram). The card number and title must match the diagram. Do not replace this with a generic five-stage summary or rely only on the separate Code walkthrough page.
+- Each UML step card must contain: (1) the matching step number/title, (2) what happens and which participants are involved, (3) real local source filename(s), (4) a formatted, syntax-colored Python or TypeScript excerpt rendered with the existing CodeBlock component, and (5) a clearly labeled "How this code explains step N" paragraph connecting the exact excerpt to that UML arrow or alternative branch.
+- Cover each interaction explicitly: run/prompt checks; fetch POST; validation/options; stream_agent/query; SDK-to-Claude boundary; receiving SDK messages; safe message projection; SSE message forwarding; timeline signals; final result fields; client ResultMessage dispatch; answer/metrics rendering and is_error; done/completion checks; runtime or missing-result errors; client error/snackbar state; and missing-key/invalid-input rejection.
+- For steps executed internally by the SDK (provider transport/inference), show the actual query()/iterator boundary from this app and explicitly label the transport as SDK-managed. Do not invent application HTTP calls or expose SDK internals as if they were local source.
+- Use accurate excerpts from current source, preserve indentation, use language and filename labels, and mark omitted context as selected excerpts. If a card combines excerpts from separate functions/files, label those boundaries. Reusing the same real code for related steps is acceptable when each explanation makes its different role clear. Never fabricate source line numbers or include credentials.
+- Keep source/explanation data in workflow-steps.ts (or an equivalent small data module) and keep its numbering/titles synchronized with the SVG, PlantUML and generator. Every step card must have a stable id such as uml-step-1, retain large readable code and pastel surfaces, and wrap source filenames without page overflow.
+- Explain the streaming round trip in numbered stages: submit JSON through the proxy; validate prompt/key and apply options; consume query()'s async iterator; forward native SSE message/done/error events; parse the POST stream and update timeline/answer signals.
+- Connect stages to real source filenames. Explain that SDK-message streaming is not token streaming, and that an intermediate assistant message alone is not a completed run.
+
+CODE WALKTHROUGH
+- Show selected readable snippets from actual local source, with language and filename labels and a plain-language explanation for each.
+- All block snippets must be syntax highlighted, including Python and TypeScript walkthroughs, PowerShell/Bash setup commands, .env configuration, the inspector's JSON and fenced code in agent Markdown. Use a reusable CodeBlock component with locally installed highlight.js 11.12.0; import core and only Python, TypeScript, PowerShell, Bash, INI and JSON grammars. Unknown languages must fall back to escaped plain text.
+- Preserve source indentation, whitespace and copyable text. Use distinct, high-contrast colors for keywords, strings, numbers, functions, properties and comments. Keep code at 18px desktop / 17px mobile or larger; allow horizontal scrolling rather than shrinking it.
+- Pass highlighted HTML through Angular [innerHTML] sanitization. Never use bypassSecurityTrustHtml, evaluate snippets, load highlighting from a CDN, or let code content create executable HTML. Keep Markdown sanitization active after highlighting fenced blocks.
+- Cover the recognizable Python run_agent loop; tools=[] versus allowed_tools=[] and isolation options; native FastAPI ServerSentEvent forwarding; Angular fetch POST; and signals updating the timeline and final answer.
+- Label excerpts as selected snippets where imports or surrounding error handling are omitted. Do not invent line numbers or imply simplified excerpts are complete files.
+- Finish with the lesson takeaway and a link back to the lab.
+
+LAYOUT AND CONTENT QUALITY
+- Use two-column lab and terminal layouts on wide screens, readable learning-card grids, and a single column on mobile. Avoid horizontal page overflow; constrain long JSON, Markdown tables and code blocks to their containers.
+- Ensure dark mode covers the lab, lesson cards, command blocks, navigation, hints and the inspector. Do not mix low-contrast light-theme text with dark backgrounds.
+- Keep the teaching scope small: do not add chat history, authentication, file tools, cloud deployment or other exercise features as part of this visual/content refresh.
+
+== 5. QUALITY GATES (run them all and fix every error before finishing) ==
+- Back-end: pytest passes (health, prompt validation, /query and /stream with query() mocked).
+- Front-end: "ng build" (production) succeeds with zero errors, and "ng test" passes (at least AgentService and the main component). Include tests that colored code preserves source text, malicious HTML stays inert, unknown languages fall back safely, all six grammars work, Markdown code fences remain sanitized, and the UML image/source downloads are present. Validate that the generated SVG parses successfully and matches the diagram assets regenerated by the script. Verify that every numbered UML interaction has exactly one matching explanation card with a highlighted code excerpt, source reference and explanatory paragraph; check step numbers and titles against the SVG. Keep the general Code walkthrough section as well. Include a meaningful navigation check: lesson section selection works and returning to the lab preserves prompt and result. Keep SSE parsing, error and sanitized-Markdown checks. Report any bundle-size warning honestly.
+- Check all five sections for correct Python/Angular content, genuine links, readable text, keyboard navigation and responsive wrapping. If browser QA is available, inspect desktop, mobile, dark mode and 200% zoom; otherwise state the visual verification limitation.
+- End-to-end: start both servers and, if ANTHROPIC_API_KEY is set in this environment, run one real prompt through the UI flow (or call the API with curl through the Angular proxy). If no key is available, say so clearly. Never claim it works without running it.
+- If Vitest workers time out before tests run on a constrained machine, retry with VITEST_MAX_WORKERS=1. Record the startup issue and the final test outcome; do not skip tests or suppress failures.
+- Finally, print the installed versions (pip freeze for the listed packages, and "ng version") and confirm that they match section 1.
+
+== 6. README.md (written for students) ==
+1. Title, one-paragraph purpose, and the concepts it teaches.
+2. An ASCII architecture diagram: Browser -> Angular (AgentService) -> FastAPI (/api) -> Claude Agent SDK -> Claude.
+3. A tech stack table with the exact versions from section 1, and the note about TypeScript 6.0 vs 7.x.
+4. A project files table, including lesson-content.ts, code-block.ts, the UML generator/assets, asset source documentation and the verification record. Explain the five application sections, hash/route navigation, and preserved lab state. Document syntax highlighting, pastel card themes, the UML downloads/regeneration command, and the one-to-one mapping from UML steps to colored source excerpts and explanations.
+5. Part 1 · Configure and run, with both Windows PowerShell and macOS/Linux commands:
+   prerequisites (Python, Node.js, an API key from https://platform.claude.com starting with sk-ant-) → back-end (venv, pip install -r requirements.txt, copy .env.example to .env, python run.py, open http://localhost:8000/docs) → front-end (npm install, npm start with the proxy, open http://localhost:4200).
+   Make the commands copy-and-paste ready, with an explicit starting folder and separate terminal 1 / terminal 2 blocks. Use non-overwriting .env creation, for example PowerShell: if (!(Test-Path backend\.env)) { Copy-Item backend\.env.example backend\.env }. Show all five .env settings and explain how to replace the template key without displaying the real value. Do not recreate .env on subsequent runs.
+   Include the existing-venv Windows startup commands from the application folder:
+     Terminal 1: cd backend ; ..\.venv\Scripts\python.exe run.py
+     Terminal 2: cd frontend ; npm start
+   Also provide macOS/Linux equivalents, browser URLs and Ctrl+C stop instructions. Explain that edits to .env require a backend restart, and that /api/health should report api_key_configured=true before testing a real prompt. A configured key is not proof of successful upstream authentication.
+   Add a security box: treat the key like a password, keep it only in backend/.env, never commit it, and never put it in the front-end.
+6. Part 2 · How the app was built: a step-by-step explanation with code snippets. Start from the 7-line Lesson 0 agent and show side by side how it maps into agent_service.py. Then cover the ClaudeAgentOptions security settings, the endpoints, SSE streaming, the Angular AgentService (fetch streaming), signals-based state, and the stream inspector component.
+   Include the flow line: Browser -> AgentService -> POST /api/agent/stream -> stream_agent() -> query() -> Claude -> message stream -> SSE -> timeline + answer card.
+7. Troubleshooting table: ModuleNotFoundError (venv not active), PowerShell execution policy (Set-ExecutionPolicy -Scope CurrentUser RemoteSigned), API key not detected, the Windows NotImplementedError (event loop), port 8000/4200 in use, CORS/proxy errors, the TypeScript version mismatch, the Windows UnicodeEncodeError (set PYTHONUTF8=1), and Vitest worker-startup timeouts (retry with VITEST_MAX_WORKERS=1).
+8. Exercises: a system-prompt "personality" selector, conversation history with ClaudeSDKClient, a "Stop" button that cancels the stream, Docker Compose for both services, and authentication in front of the API.
+9. Key takeaway: the agent is still the same few lines, and the enterprise application is the architecture around them.
+
+== 7. HANDOFF AND PROMPT SYNCHRONIZATION ==
+- Keep BUILD-PROMPT.txt synchronized with this specification and include ASSETS.md for external visuals.
+- Document the visual reference, the Python-specific adaptations and actual verification results in the README / VERIFICATION.md. Preserve existing .env files and never display their contents during checks.
+- Before handoff, audit each item in REQUIRED OUTCOME against the actual files and interface. Confirm the reference-based design, readable fonts, pastel cards, colored/formatted code and UML workflow are all implemented, not left as future work.
+- Provide concise instructions to start both services and view the improved application, plus links to the updated prompt and verification record. Report test/build results and any unperformed visual checks accurately.

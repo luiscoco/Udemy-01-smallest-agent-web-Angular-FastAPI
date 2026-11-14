@@ -1,0 +1,45 @@
+<a class="skip-link" href="#lesson-content">Skip to lesson content</a>
+<header class="topbar">
+  <a class="brand" href="#lab" aria-label="The Smallest Agent home"><span class="brand-icon">a<span>·</span></span><span>The Smallest Agent <small>CLAUDE AGENT SDK · WEB EDITION</small></span></a>
+  <div class="header-actions"><span class="health"><i [class.online]="health()?.status === 'ok'"></i>{{ health() ? 'Backend connected' : 'Backend offline' }}</span>
+  @if (health() && !health()?.api_key_configured) { <span class="warning">API key not configured</span> }
+  <button mat-stroked-button (click)="toggleTheme()" [attr.aria-label]="dark() ? 'Switch to light mode' : 'Switch to dark mode'">{{ dark() ? '☀ Light' : '☾ Dark' }}</button></div>
+</header>
+<main>
+  <div class="page-heading course-hero">
+    <div><span class="eyebrow">LEARN IT. BUILD IT. WATCH IT WORK.</span><h1>Your first agent.<br><em>A real web application.</em></h1><p class="hero-lead">Take the Python agent you already know from the terminal to the browser. Send a prompt, follow the messages, and understand every layer.</p><div class="hero-tags"><span>Python + FastAPI</span><span>Angular + Material</span><span>Built for learning</span></div></div>
+    <figure class="mascot"><img src="astronaut.png" alt="Waving course astronaut" width="380" height="483"><figcaption>A small step into agent development.</figcaption></figure>
+  </div>
+  <nav class="lesson-nav" aria-label="Application sections">
+    @for (tab of sections; track tab.id) { <a [href]="'#' + tab.id" [attr.aria-current]="section() === tab.id ? 'page' : null">{{ tab.label }}</a> }
+  </nav>
+  <div id="lesson-content" tabindex="-1">
+  <section [hidden]="section() !== 'lab'" aria-labelledby="lab-title">
+    <div class="section-intro lab-intro"><div><span class="eyebrow">APPLICATION LAB</span><h2 id="lab-title">Start with a little curiosity.</h2><p>One prompt. One agent. See exactly what comes back.</p></div><a href="#setup" class="text-link">Need help getting started? →</a></div>
+    <div class="lesson-flow" aria-label="Three steps to try the agent"><div><span>01</span><strong>Ask a question</strong><p>Start with Hello world!</p></div><div><span>02</span><strong>Watch the stream</strong><p>Inspect real SDK messages</p></div><div><span>03</span><strong>Read the result</strong><p>Check the answer and metrics</p></div></div>
+    <div class="workspace">
+    <div class="left-column">
+      <section class="panel" aria-labelledby="prompt-title">
+        <div class="panel-heading"><div><span class="eyebrow">YOUR FIRST PYTHON AGENT</span><h2 id="prompt-title">Give your agent a prompt</h2></div></div>
+        <label class="field-label" for="prompt">What would you like to ask?</label>
+        <mat-form-field appearance="outline" class="prompt-field" subscriptSizing="dynamic"><textarea matInput id="prompt" [(ngModel)]="prompt" [disabled]="state() === 'running'" maxlength="4000" rows="5" (keydown.control.enter)="$event.preventDefault(); run()" aria-describedby="prompt-hint"></textarea><mat-hint id="prompt-hint">Keep it simple. Your first agent starts with a question.</mat-hint><mat-hint align="end">{{ prompt.length }}/4000</mat-hint></mat-form-field>
+        <div class="examples"><span>TRY A PROMPT</span>@for (example of examples; track example) { <button class="example" [disabled]="state() === 'running'" (click)="prompt = example">{{ example }}</button> }</div>
+        <div class="run-toolbar"><mat-button-toggle-group [(ngModel)]="mode" [disabled]="state() === 'running'" aria-label="Response mode"><mat-button-toggle value="stream">Stream</mat-button-toggle><mat-button-toggle value="simple">Simple</mat-button-toggle></mat-button-toggle-group><button mat-flat-button (click)="run()" [disabled]="state() === 'running' || !prompt.trim() || prompt.trim().length > 4000">@if (state() === 'running') { <mat-spinner diameter="17"/> Running… } @else { Run agent <span aria-hidden="true">↗</span> }</button></div>
+        <div class="run-footnote"><span>{{ mode === 'stream' ? 'Watch every SDK message as it arrives' : 'Receive the final answer in one response' }}</span><kbd>Ctrl + Enter</kbd></div>
+      </section>
+      <section class="panel answer-panel" aria-labelledby="answer-title" [attr.aria-busy]="state() === 'running'">
+        <div class="panel-heading"><div><span class="eyebrow">02 / OUTPUT</span><h2 id="answer-title">Agent’s answer</h2></div>@if (result()) { <button mat-stroked-button (click)="copy()" aria-label="Copy answer">Copy</button> }<span class="state" [attr.data-state]="state()">{{ state() }}</span></div>
+        @if (state() === 'running') { <div class="loading" role="status"><mat-spinner diameter="24"/><span>Agent is working <strong>{{ elapsed() }} ms</strong></span></div> }
+        @if (error()) { <p class="error-message" role="alert">{{ error() }}</p> }
+        @if (result(); as answerResult) { <div class="markdown" [innerHTML]="answer()"></div><div class="stats"><span><strong>{{ answerResult.num_turns }}</strong> turns</span><span><strong>{{ answerResult.duration_ms }}</strong> ms</span><span><strong>{{ answerResult.total_cost_usd === null ? '—' : ('$' + (answerResult.total_cost_usd | number:'1.6-6')) }}</strong> USD</span></div> }
+        @if (state() === 'idle') { <div class="answer-empty"><span aria-hidden="true">✧</span><p>Your next discovery starts with a question.</p><small>Run the agent to see a real answer here. No sample response is preloaded.</small></div> }
+      </section>
+    </div>
+    <app-stream-inspector [messages]="messages()" [mode]="mode"/>
+  </div>
+  <aside class="lesson-note"><strong>The same agent, with a web application around it.</strong><p>Your prompt goes through Angular → FastAPI → the Python Agent SDK → Claude. Built-in tools are disabled, and the API key stays on the server. Submitting a prompt may use API credits.</p><a href="#architecture">Explore the architecture →</a></aside>
+  </section>
+  <app-lesson-content [section]="section()"/>
+  </div>
+  <footer><div><strong>The Smallest Agent · Web Edition</strong><p>Python at the core. A real application around it.</p></div><a href="https://github.com/luiscoco/Udemy-Claude-Agent-SDK-lesson01-app" target="_blank" rel="noopener noreferrer">Course design reference ↗</a></footer>
+</main>
